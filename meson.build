@@ -165,17 +165,6 @@ conf_data.set(
 )
 
 conf_data.set_quoted(
-    'SYSTEM_DUMP_OBJPATH',
-    get_option('SYSTEM_DUMP_OBJPATH'),
-    description: 'The system dump manager D-Bus path',
-)
-conf_data.set_quoted(
-    'SYSTEM_DUMP_OBJ_ENTRY',
-    get_option('SYSTEM_DUMP_OBJ_ENTRY'),
-    description: 'The system dump entry D-Bus object path',
-)
-
-conf_data.set_quoted(
     'RESOURCE_DUMP_OBJPATH',
     get_option('RESOURCE_DUMP_OBJPATH'),
     description: 'The resource dump manager D-Bus path',
