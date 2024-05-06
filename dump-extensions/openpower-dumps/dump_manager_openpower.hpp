@@ -1,32 +1,24 @@
 #pragma once
 
 #include "dump_manager.hpp"
-#include "dump_utils.hpp"
-#include "xyz/openbmc_project/Dump/NewDump/server.hpp"
 
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server/object.hpp>
 #include <xyz/openbmc_project/Dump/Create/server.hpp>
 
-namespace openpower
-{
-namespace dump
-{
-namespace system
+namespace openpower::dump
 {
 
-constexpr uint32_t INVALID_SOURCE_ID = 0xFFFFFFFF;
-using NotifyIface = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Dump::server::Create,
-    sdbusplus::xyz::openbmc_project::Dump::server::NewDump>;
+using OpDumpIfaces = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Dump::server::Create>;
 
 /** @class Manager
- *  @brief System Dump  manager implementation.
+ *  @brief OpenPOWER dump manager implementation.
  *  @details A concrete implementation for the
- *  xyz.openbmc_project.Dump.Notify DBus API
+ *  xyz.openbmc_project.Dump.Create D-Bus API.
  */
 class Manager :
-    virtual public NotifyIface,
+    virtual public OpDumpIfaces,
     virtual public phosphor::dump::Manager
 {
   public:
@@ -45,7 +37,7 @@ class Manager :
      */
     Manager(sdbusplus::bus_t& bus, const char* path,
             const std::string& baseEntryPath) :
-        NotifyIface(bus, path),
+        OpDumpIfaces(bus, path),
         phosphor::dump::Manager(bus, path, baseEntryPath)
     {}
 
@@ -55,15 +47,8 @@ class Manager :
         // after the service restart.
     }
 
-    /** @brief Notify the system dump manager about creation of a new dump.
-     *  @param[in] dumpId - Id from the source of the dump.
-     *  @param[in] size - Size of the dump.
-     */
-    void notify(uint32_t dumpId, uint64_t size) override;
-
     /** @brief Implementation for CreateDump
-     *  Method to create a new system dump entry when user
-     *  requests for a new system dump.
+     *  Method to create a new OpenPOWER dump entry.
      *
      *  @return object_path - The path to the new dump entry.
      */
@@ -71,6 +56,4 @@ class Manager :
         phosphor::dump::DumpCreateParams params) override;
 };
 
-} // namespace system
-} // namespace dump
-} // namespace openpower
+} // namespace openpower::dump
