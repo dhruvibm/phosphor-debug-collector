@@ -1,23 +1,43 @@
 #include "op_dump_util.hpp"
 
+#include "dump_manager.hpp"
 #include "dump_utils.hpp"
-#include "xyz/openbmc_project/Common/error.hpp"
-#include "xyz/openbmc_project/Dump/Create/error.hpp"
 
 #include <unistd.h>
 
+#include <com/ibm/Dump/Create/common.hpp>
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
 #include <phosphor-logging/lg2.hpp>
+#include <xyz/openbmc_project/Common/OriginatedBy/common.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
+#include <xyz/openbmc_project/Dump/Create/common.hpp>
+#include <xyz/openbmc_project/Dump/Create/error.hpp>
 
 #include <filesystem>
 
-namespace openpower
+namespace openpower::dump::util
 {
-namespace dump
+
+namespace
 {
-namespace util
+template <typename T>
+std::optional<T> safeExtractParameter(
+    const std::string& key, const phosphor::dump::DumpCreateParams& params)
 {
+    auto it = params.find(key);
+    if (it == params.end())
+    {
+        return std::nullopt;
+    }
+    if (!std::holds_alternative<T>(it->second))
+    {
+        lg2::error("An invalid value was passed for {KEY}", "KEY", key);
+        throwInvalidArgument(key, "INVALID_INPUT");
+    }
+    return std::get<T>(it->second);
+}
+} // namespace
 
 bool isOPDumpsEnabled(sdbusplus::bus_t& bus)
 {
@@ -107,6 +127,84 @@ bool isSystemDumpInProgress(sdbusplus::bus_t& bus)
     return false;
 }
 
-} // namespace util
-} // namespace dump
-} // namespace openpower
+openpower::dump::DumpParameters extractDumpParameters(
+    const phosphor::dump::DumpCreateParams& params)
+{
+    using OpCreate = sdbusplus::common::com::ibm::dump::Create;
+    using xyzCreate = sdbusplus::common::xyz::openbmc_project::dump::Create;
+
+    // Extract mandatory parameters
+    std::optional<std::string> type = safeExtractParameter<std::string>(
+        OpCreate::convertCreateParametersToString(
+            OpCreate::CreateParameters::DumpType),
+        params);
+
+    // Existing system dump callers do not provide DumpType. Keep those
+    // requests working while allowing new callers to select other types.
+    openpower::dump::OpDumpTypes dumpType = OpDumpTypes::System;
+    if (type.has_value())
+    {
+        dumpType = OpCreate::convertDumpTypeFromString(*type);
+    }
+
+    std::string originatorId =
+        safeExtractParameter<std::string>(
+            xyzCreate::convertCreateParametersToString(
+                xyzCreate::CreateParameters::OriginatorId),
+            params)
+            .value_or("");
+
+    std::optional<std::string> originatorTypeStr =
+        safeExtractParameter<std::string>(
+            xyzCreate::convertCreateParametersToString(
+                xyzCreate::CreateParameters::OriginatorType),
+            params);
+
+    phosphor::dump::originatorTypes originatorType =
+        phosphor::dump::originatorTypes::Internal;
+
+    if (originatorTypeStr.has_value())
+    {
+        originatorType = sdbusplus::xyz::openbmc_project::Common::server::
+            OriginatedBy::convertOriginatorTypesFromString(*originatorTypeStr);
+    }
+
+    // Extract optional parameters
+    std::optional<std::string> vspString = safeExtractParameter<std::string>(
+        OpCreate::convertCreateParametersToString(
+            OpCreate::CreateParameters::VSPString),
+        params);
+
+    std::optional<std::string> userChallenge =
+        safeExtractParameter<std::string>(
+            OpCreate::convertCreateParametersToString(
+                OpCreate::CreateParameters::Password),
+            params);
+
+    std::optional<uint64_t> eid = safeExtractParameter<uint64_t>(
+        OpCreate::convertCreateParametersToString(
+            OpCreate::CreateParameters::ErrorLogId),
+        params);
+
+    std::optional<uint64_t> fid = safeExtractParameter<uint64_t>(
+        OpCreate::convertCreateParametersToString(
+            OpCreate::CreateParameters::FailingUnitId),
+        params);
+
+    return {dumpType, vspString,    userChallenge, eid,
+            fid,      originatorId, originatorType};
+}
+
+[[noreturn]] void throwInvalidArgument(const std::string& argumentName,
+                                       const std::string& errorDetail)
+{
+    using namespace phosphor::logging;
+    using InvalidArgument =
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
+    using Argument = xyz::openbmc_project::Common::InvalidArgument;
+
+    elog<InvalidArgument>(Argument::ARGUMENT_NAME(argumentName.c_str()),
+                          Argument::ARGUMENT_VALUE(errorDetail.c_str()));
+}
+
+} // namespace openpower::dump::util
