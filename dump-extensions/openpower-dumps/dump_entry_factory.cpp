@@ -10,13 +10,35 @@
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <format>
+#include <string_view>
 
 namespace openpower::dump
 {
 
 using namespace phosphor::logging;
 using namespace sdbusplus::xyz::openbmc_project::Common::Error;
+
+namespace
+{
+bool createsNonDisruptiveSystemDump(const std::optional<std::string>& vspString)
+{
+    if (!vspString.has_value() || vspString->empty())
+    {
+        return true;
+    }
+
+    constexpr std::string_view systemSelector = "SYSTEM";
+    return vspString->size() == systemSelector.size() &&
+           std::equal(vspString->begin(), vspString->end(),
+                      systemSelector.begin(), [](char input, char expected) {
+                          return std::toupper(static_cast<unsigned char>(
+                                     input)) == expected;
+                      });
+}
+} // namespace
 
 std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createSystemDumpEntry(
     uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
@@ -85,6 +107,16 @@ std::unique_ptr<phosphor::dump::Entry>
             Reason("Resource dump can be initiated only when the host is up"));
     }
 
+    if (createsNonDisruptiveSystemDump(dumpParams.vspString))
+    {
+        return std::make_unique<system::Entry>(
+            bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
+            phosphor::dump::OperationStatus::InProgress,
+            dumpParams.originatorId, dumpParams.originatorType,
+            system::SystemImpact::NonDisruptive,
+            dumpParams.userChallenge.value_or(""), mgr);
+    }
+
     return std::make_unique<resource::Entry>(
         bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
         dumpParams.vspString.value_or(""),
@@ -113,7 +145,6 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
             return createSystemDumpEntry(id, objPath, timeStamp, dumpParams);
         case OpDumpTypes::Resource:
             return createResourceDumpEntry(id, objPath, timeStamp, dumpParams);
-
         default:
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
     }
