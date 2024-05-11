@@ -2,10 +2,34 @@
 
 #include "dump_utils.hpp"
 
-namespace openpower
+#include <com/ibm/Dump/Create/common.hpp>
+
+#include <cstdint>
+#include <optional>
+#include <string>
+
+namespace openpower::dump
 {
-namespace dump
+using OpDumpTypes = sdbusplus::common::com::ibm::dump::Create::DumpType;
+
+/**
+ * @struct DumpParameters
+ * @brief Holds parameters relevant to dump creation.
+ *
+ * This structure encapsulates all necessary parameters for creating a dump,
+ * including optional and mandatory fields based on the type of dump.
+ */
+struct DumpParameters
 {
+    OpDumpTypes type;
+    std::optional<std::string> vspString;
+    std::optional<std::string> userChallenge;
+    std::optional<uint64_t> eid;
+    std::optional<uint64_t> fid;
+    std::string originatorId;
+    phosphor::dump::originatorTypes originatorType;
+};
+
 namespace util
 {
 
@@ -41,6 +65,25 @@ BIOSAttrValueType readBIOSAttribute(const std::string& attrName,
  *          false - No dump in progress
  */
 bool isSystemDumpInProgress(sdbusplus::bus_t& bus);
+
+/**
+ * @brief Extracts and constructs a DumpParameters structure from a set of
+ * parameters.
+ *
+ * @param[in] params The map containing the parameters.
+ * @return A constructed DumpParameters structure.
+ */
+openpower::dump::DumpParameters extractDumpParameters(
+    const phosphor::dump::DumpCreateParams& params);
+
+/**
+ * @brief Throws a standardized invalid argument error.
+ *
+ * @param[in] argumentName The name of the argument that is invalid.
+ * @param[in] errorDetail The value or reason why the argument is considered
+ * invalid.
+ */
+[[noreturn]] void throwInvalidArgument(const std::string& argumentName,
+                                       const std::string& errorDetail);
 } // namespace util
-} // namespace dump
-} // namespace openpower
+} // namespace openpower::dump
