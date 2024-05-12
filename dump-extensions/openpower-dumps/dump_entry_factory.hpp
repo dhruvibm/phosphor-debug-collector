@@ -67,6 +67,30 @@ class DumpEntryFactory
         uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
         const DumpParameters& dumpParams);
 
+    /**
+     * @brief Creates a Hostboot dump entry.
+     * @param[in] id The unique identifier for the Hostboot dump entry.
+     * @param[in] objPath D-Bus entry path for the dump entry.
+     * @param[in] timeStamp Timestamp marking the creation time of the dump.
+     * @param[in] dumpParams Parameters specific to the dump being created.
+     * @return A unique pointer to a newly created Hostboot dump entry.
+     */
+    std::unique_ptr<phosphor::dump::Entry> createHostbootDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams);
+
+    /**
+     * @brief Creates a Hardware dump entry.
+     * @param[in] id The unique identifier for the Hardware dump entry.
+     * @param[in] objPath D-Bus entry path for the dump entry.
+     * @param[in] timeStamp Timestamp marking the creation time of the dump.
+     * @param[in] dumpParams Parameters specific to the dump being created.
+     * @return A unique pointer to a newly created Hardware dump entry.
+     */
+    std::unique_ptr<phosphor::dump::Entry> createHardwareDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams);
+
     /** @brief sdbusplus DBus bus connection. */
     sdbusplus::bus_t& bus;
 
