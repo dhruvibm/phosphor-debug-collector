@@ -14,7 +14,11 @@
 #include <xyz/openbmc_project/Dump/Create/common.hpp>
 #include <xyz/openbmc_project/Dump/Create/error.hpp>
 
+#include <chrono>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 namespace openpower::dump::util
 {
@@ -205,6 +209,35 @@ openpower::dump::DumpParameters extractDumpParameters(
 
     elog<InvalidArgument>(Argument::ARGUMENT_NAME(argumentName.c_str()),
                           Argument::ARGUMENT_VALUE(errorDetail.c_str()));
+}
+
+uint64_t timeToEpoch(const std::string& timeString)
+{
+    using namespace std::chrono;
+
+    std::tm t{};
+    std::istringstream ss(timeString);
+    ss >> std::get_time(&t, "%Y%m%d%H%M%S");
+    if (ss.fail())
+    {
+        lg2::error("Invalid human readable time value {TIMESTRING}",
+                   "TIMESTRING", timeString);
+        return duration_cast<microseconds>(
+                   system_clock::now().time_since_epoch())
+            .count();
+    }
+
+    const auto epochSeconds = ::timegm(&t);
+    if (epochSeconds == -1)
+    {
+        lg2::error("Failed to convert time value {TIMESTRING}", "TIMESTRING",
+                   timeString);
+        return duration_cast<microseconds>(
+                   system_clock::now().time_since_epoch())
+            .count();
+    }
+
+    return duration_cast<microseconds>(seconds(epochSeconds)).count();
 }
 
 } // namespace openpower::dump::util

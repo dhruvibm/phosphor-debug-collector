@@ -85,5 +85,8 @@ openpower::dump::DumpParameters extractDumpParameters(
  */
 [[noreturn]] void throwInvalidArgument(const std::string& argumentName,
                                        const std::string& errorDetail);
+
+/** @brief Convert a YYYYMMDDhhmmss timestamp to epoch microseconds. */
+uint64_t timeToEpoch(const std::string& timeString);
 } // namespace util
 } // namespace openpower::dump

@@ -1,5 +1,6 @@
 #include "dump_entry_factory.hpp"
 
+#include "op_dump_consts.hpp"
 #include "op_dump_util.hpp"
 #include "openpower_dump_entry.hpp"
 
@@ -35,6 +36,24 @@ bool createsNonDisruptiveSystemDump(const std::optional<std::string>& vspString)
                           return std::toupper(static_cast<unsigned char>(
                                      input)) == expected;
                       });
+}
+
+uint32_t getDumpIdPrefix(OpDumpTypes dumpType)
+{
+    switch (dumpType)
+    {
+        case OpDumpTypes::Hardware:
+            return HARDWARE_DUMP_ID_PREFIX;
+        case OpDumpTypes::Hostboot:
+            return HOSTBOOT_DUMP_ID_PREFIX;
+        case OpDumpTypes::System:
+            return SYSTEM_DUMP_ID_PREFIX;
+        case OpDumpTypes::Resource:
+            return RESOURCE_DUMP_ID_PREFIX;
+        default:
+            lg2::error("Unsupported dump type: {TYPE}", "TYPE", dumpType);
+            util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
+    }
 }
 } // namespace
 
@@ -123,13 +142,60 @@ std::unique_ptr<phosphor::dump::Entry>
         dumpParams.originatorType, mgr);
 }
 
+std::unique_ptr<phosphor::dump::Entry>
+    DumpEntryFactory::createHostbootDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams)
+{
+    if (!dumpParams.eid.has_value())
+    {
+        lg2::error("Required parameter error log id is missing");
+        util::throwInvalidArgument("ERROR_LOG_ID", "ARGUMENT_MISSING");
+    }
+
+    return std::make_unique<hostboot::Entry>(
+        bus, objPath.c_str(), id, timeStamp, 0, std::filesystem::path(),
+        phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
+        dumpParams.originatorType, dumpParams.eid.value(), mgr);
+}
+
+std::unique_ptr<phosphor::dump::Entry>
+    DumpEntryFactory::createHardwareDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams)
+{
+    if (!dumpParams.eid.has_value())
+    {
+        lg2::error("Required parameter error log id is missing");
+        util::throwInvalidArgument("ERROR_LOG_ID", "ARGUMENT_MISSING");
+    }
+    if (!dumpParams.fid.has_value())
+    {
+        lg2::error("Required parameter id of failing unit is missing");
+        util::throwInvalidArgument("FAILING_UNIT_ID", "ARGUMENT_MISSING");
+    }
+
+    return std::make_unique<hardware::Entry>(
+        bus, objPath.c_str(), id, timeStamp, 0, std::filesystem::path(),
+        phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
+        dumpParams.originatorType, dumpParams.eid.value(),
+        dumpParams.fid.value(), mgr);
+}
+
 std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
     uint32_t id, const phosphor::dump::DumpCreateParams& params)
 {
     DumpParameters dumpParams = util::extractDumpParameters(params);
 
-    std::string idStr = std::format("{:08X}", id);
+    auto entryType = dumpParams.type;
+    if (dumpParams.type == OpDumpTypes::Resource &&
+        createsNonDisruptiveSystemDump(dumpParams.vspString))
+    {
+        entryType = OpDumpTypes::System;
+    }
 
+    id |= getDumpIdPrefix(entryType);
+    std::string idStr = std::format("{:08X}", id);
     auto objPath = std::filesystem::path(baseEntryPath) / idStr;
 
     uint64_t timeStamp =
@@ -143,10 +209,14 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
             return createSystemDumpEntry(id, objPath, timeStamp, dumpParams);
         case OpDumpTypes::Resource:
             return createResourceDumpEntry(id, objPath, timeStamp, dumpParams);
+        case OpDumpTypes::Hostboot:
+            return createHostbootDumpEntry(id, objPath, timeStamp, dumpParams);
+        case OpDumpTypes::Hardware:
+            return createHardwareDumpEntry(id, objPath, timeStamp, dumpParams);
+        case OpDumpTypes::SBE:
         default:
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
     }
-    return nullptr;
 }
 
 } // namespace openpower::dump
