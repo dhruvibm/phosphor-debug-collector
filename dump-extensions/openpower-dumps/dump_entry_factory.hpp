@@ -91,6 +91,18 @@ class DumpEntryFactory
         uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
         const DumpParameters& dumpParams);
 
+    /**
+     * @brief Creates an SBE dump entry.
+     * @param[in] id The unique identifier for the SBE dump entry.
+     * @param[in] objPath D-Bus entry path for the dump entry.
+     * @param[in] timeStamp Timestamp marking the creation time of the dump.
+     * @param[in] dumpParams Parameters specific to the dump being created.
+     * @return A unique pointer to a newly created SBE dump entry.
+     */
+    std::unique_ptr<phosphor::dump::Entry> createSBEDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams);
+
     /** @brief sdbusplus DBus bus connection. */
     sdbusplus::bus_t& bus;
 
