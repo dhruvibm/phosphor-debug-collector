@@ -46,6 +46,8 @@ uint32_t getDumpIdPrefix(OpDumpTypes dumpType)
             return HARDWARE_DUMP_ID_PREFIX;
         case OpDumpTypes::Hostboot:
             return HOSTBOOT_DUMP_ID_PREFIX;
+        case OpDumpTypes::SBE:
+            return SBE_DUMP_ID_PREFIX;
         case OpDumpTypes::System:
             return SYSTEM_DUMP_ID_PREFIX;
         case OpDumpTypes::Resource:
@@ -182,6 +184,27 @@ std::unique_ptr<phosphor::dump::Entry>
         dumpParams.fid.value(), mgr);
 }
 
+std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createSBEDumpEntry(
+    uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+    const DumpParameters& dumpParams)
+{
+    if (!dumpParams.eid.has_value())
+    {
+        lg2::error("Required parameter error log id is missing");
+        util::throwInvalidArgument("ERROR_LOG_ID", "ARGUMENT_MISSING");
+    }
+    if (!dumpParams.fid.has_value())
+    {
+        lg2::error("Required parameter id of failing unit is missing");
+        util::throwInvalidArgument("FAILING_UNIT_ID", "ARGUMENT_MISSING");
+    }
+    return std::make_unique<sbe::Entry>(
+        bus, objPath.c_str(), id, timeStamp, 0, std::filesystem::path(),
+        phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
+        dumpParams.originatorType, dumpParams.eid.value(),
+        dumpParams.fid.value(), mgr);
+}
+
 std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
     uint32_t id, const phosphor::dump::DumpCreateParams& params)
 {
@@ -214,6 +237,7 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
         case OpDumpTypes::Hardware:
             return createHardwareDumpEntry(id, objPath, timeStamp, dumpParams);
         case OpDumpTypes::SBE:
+            return createSBEDumpEntry(id, objPath, timeStamp, dumpParams);
         default:
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
     }
