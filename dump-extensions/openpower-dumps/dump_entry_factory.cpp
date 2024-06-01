@@ -48,6 +48,8 @@ uint32_t getDumpIdPrefix(OpDumpTypes dumpType)
             return HOSTBOOT_DUMP_ID_PREFIX;
         case OpDumpTypes::SBE:
             return SBE_DUMP_ID_PREFIX;
+        case OpDumpTypes::MemoryBufferSBE:
+            return MSBE_DUMP_ID_PREFIX;
         case OpDumpTypes::System:
             return SYSTEM_DUMP_ID_PREFIX;
         case OpDumpTypes::Resource:
@@ -236,6 +238,7 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
             return createHostbootDumpEntry(id, objPath, timeStamp, dumpParams);
         case OpDumpTypes::Hardware:
             return createHardwareDumpEntry(id, objPath, timeStamp, dumpParams);
+        case OpDumpTypes::MemoryBufferSBE:
         case OpDumpTypes::SBE:
             return createSBEDumpEntry(id, objPath, timeStamp, dumpParams);
         default:
