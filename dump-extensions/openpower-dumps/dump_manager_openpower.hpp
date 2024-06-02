@@ -84,10 +84,7 @@ class Manager :
             })
     {}
 
-    void restore() override
-    {
-        // TODO: Restore serialized OpenPOWER entries.
-    }
+    void restore() override;
 
     sdbusplus::object_path createDump(
         phosphor::dump::DumpCreateParams params) override;

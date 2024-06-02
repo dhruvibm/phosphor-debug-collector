@@ -12,6 +12,7 @@
 #include <xyz/openbmc_project/Dump/Entry/System/server.hpp>
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -20,6 +21,16 @@ namespace openpower::dump
 
 using originatorTypes = sdbusplus::xyz::openbmc_project::Common::server::
     OriginatedBy::OriginatorTypes;
+
+/** @brief OpenPOWER properties not covered by the common serialization. */
+struct EntryMetadata
+{
+    std::optional<uint32_t> systemImpact;
+    std::optional<std::string> userChallenge;
+    std::optional<std::string> vspString;
+    std::optional<uint64_t> errorLogId;
+    std::optional<uint64_t> failingUnitId;
+};
 
 /** @class Entry
  *  @brief File-backed base entry for OpenPOWER dumps.
@@ -56,11 +67,26 @@ class Entry : public virtual phosphor::dump::Entry
                               parent)
     {}
 
+    /** @brief Construct a silently registered entry for restoration. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent)
+    {}
+
     /** @brief Delete the local dump and its D-Bus entry. */
     void delete_() override;
 
     /** @brief Offload the local dump file. */
     void initiateOffload(std::string uri) override;
+
+    /** @brief Serialize common and OpenPOWER-specific properties. */
+    void serialize() override;
+
+    /** @brief Restore common and OpenPOWER-specific properties. */
+    void deserialize(const std::filesystem::path& dumpPath) override;
 
     /** @brief Complete an entry after its dump file is written locally.
      *  @param[in] timeStamp Dump completion timestamp.
@@ -69,6 +95,31 @@ class Entry : public virtual phosphor::dump::Entry
      */
     void update(uint64_t timeStamp, uint64_t fileSize,
                 const std::filesystem::path& filePath)
+    {
+        complete(timeStamp, fileSize, filePath);
+        serialize();
+    }
+
+    /** @brief Restore completed file properties without reserializing. */
+    void restoreFile(uint64_t timeStamp, uint64_t fileSize,
+                     const std::filesystem::path& filePath)
+    {
+        complete(timeStamp, fileSize, filePath);
+    }
+
+  protected:
+    /** @brief Return properties owned by the derived dump interface. */
+    virtual EntryMetadata getMetadata() const
+    {
+        return {};
+    }
+
+    /** @brief Apply properties owned by the derived dump interface. */
+    virtual void restoreMetadata(const EntryMetadata& /*metadata*/) {}
+
+  private:
+    void complete(uint64_t timeStamp, uint64_t fileSize,
+                  const std::filesystem::path& filePath)
     {
         file = filePath;
         elapsed(timeStamp);
@@ -125,6 +176,42 @@ class Entry : public virtual openpower::dump::Entry, public virtual SystemIntf
         userChallenge(std::move(userChallengeValue));
         this->SystemIntf::emit_object_added();
     }
+
+    /** @brief Construct a restored System entry without InterfacesAdded. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent),
+        openpower::dump::Entry(bus, objPath, dumpId, parent),
+        SystemIntf(bus, objPath.c_str(), SystemIntf::action::defer_emit)
+    {
+        sourceDumpId(INVALID_SOURCE_ID);
+        systemImpact(SystemImpact::Disruptive);
+    }
+
+  protected:
+    EntryMetadata getMetadata() const override
+    {
+        EntryMetadata metadata;
+        metadata.systemImpact = static_cast<uint32_t>(systemImpact());
+        metadata.userChallenge = userChallenge();
+        return metadata;
+    }
+
+    void restoreMetadata(const EntryMetadata& metadata) override
+    {
+        if (metadata.systemImpact.has_value())
+        {
+            systemImpact(
+                static_cast<SystemImpact>(metadata.systemImpact.value()));
+        }
+        if (metadata.userChallenge.has_value())
+        {
+            userChallenge(metadata.userChallenge.value());
+        }
+    }
 };
 
 } // namespace system
@@ -166,6 +253,40 @@ class Entry : public virtual openpower::dump::Entry, public virtual ResourceIntf
         userChallenge(std::move(userChallengeValue));
         this->ResourceIntf::emit_object_added();
     }
+
+    /** @brief Construct a restored Resource entry without InterfacesAdded. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent),
+        openpower::dump::Entry(bus, objPath, dumpId, parent),
+        ResourceIntf(bus, objPath.c_str(), ResourceIntf::action::defer_emit)
+    {
+        sourceDumpId(INVALID_SOURCE_ID);
+    }
+
+  protected:
+    EntryMetadata getMetadata() const override
+    {
+        EntryMetadata metadata;
+        metadata.userChallenge = userChallenge();
+        metadata.vspString = vspString();
+        return metadata;
+    }
+
+    void restoreMetadata(const EntryMetadata& metadata) override
+    {
+        if (metadata.userChallenge.has_value())
+        {
+            userChallenge(metadata.userChallenge.value());
+        }
+        if (metadata.vspString.has_value())
+        {
+            vspString(metadata.vspString.value());
+        }
+    }
 };
 
 } // namespace resource
@@ -204,6 +325,33 @@ class Entry : public virtual openpower::dump::Entry, public virtual HostbootIntf
     {
         errorLogId(errorLogIdValue);
         this->HostbootIntf::emit_object_added();
+    }
+
+    /** @brief Construct a restored Hostboot entry without InterfacesAdded. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent),
+        openpower::dump::Entry(bus, objPath, dumpId, parent),
+        HostbootIntf(bus, objPath.c_str(), HostbootIntf::action::defer_emit)
+    {}
+
+  protected:
+    EntryMetadata getMetadata() const override
+    {
+        EntryMetadata metadata;
+        metadata.errorLogId = errorLogId();
+        return metadata;
+    }
+
+    void restoreMetadata(const EntryMetadata& metadata) override
+    {
+        if (metadata.errorLogId.has_value())
+        {
+            errorLogId(metadata.errorLogId.value());
+        }
     }
 };
 
@@ -245,6 +393,38 @@ class Entry : public virtual openpower::dump::Entry, public virtual HardwareIntf
         failingUnitId(failingUnitIdValue);
         this->HardwareIntf::emit_object_added();
     }
+
+    /** @brief Construct a restored Hardware entry without InterfacesAdded. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent),
+        openpower::dump::Entry(bus, objPath, dumpId, parent),
+        HardwareIntf(bus, objPath.c_str(), HardwareIntf::action::defer_emit)
+    {}
+
+  protected:
+    EntryMetadata getMetadata() const override
+    {
+        EntryMetadata metadata;
+        metadata.errorLogId = errorLogId();
+        metadata.failingUnitId = failingUnitId();
+        return metadata;
+    }
+
+    void restoreMetadata(const EntryMetadata& metadata) override
+    {
+        if (metadata.errorLogId.has_value())
+        {
+            errorLogId(metadata.errorLogId.value());
+        }
+        if (metadata.failingUnitId.has_value())
+        {
+            failingUnitId(metadata.failingUnitId.value());
+        }
+    }
 };
 
 } // namespace hardware
@@ -284,6 +464,38 @@ class Entry : public virtual openpower::dump::Entry, public virtual SBEIntf
         errorLogId(errorLogIdValue);
         failingUnitId(failingUnitIdValue);
         this->SBEIntf::emit_object_added();
+    }
+
+    /** @brief Construct a restored SBE entry without InterfacesAdded. */
+    Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
+          phosphor::dump::Manager& parent) :
+        phosphor::dump::Entry(bus, objPath.c_str(), dumpId, 0, 0,
+                              std::filesystem::path(),
+                              phosphor::dump::OperationStatus::InProgress,
+                              std::string(), originatorTypes::Internal, parent),
+        openpower::dump::Entry(bus, objPath, dumpId, parent),
+        SBEIntf(bus, objPath.c_str(), SBEIntf::action::defer_emit)
+    {}
+
+  protected:
+    EntryMetadata getMetadata() const override
+    {
+        EntryMetadata metadata;
+        metadata.errorLogId = errorLogId();
+        metadata.failingUnitId = failingUnitId();
+        return metadata;
+    }
+
+    void restoreMetadata(const EntryMetadata& metadata) override
+    {
+        if (metadata.errorLogId.has_value())
+        {
+            errorLogId(metadata.errorLogId.value());
+        }
+        if (metadata.failingUnitId.has_value())
+        {
+            failingUnitId(metadata.failingUnitId.value());
+        }
     }
 };
 
