@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cctype>
 #include <format>
+#include <optional>
 #include <string_view>
 
 namespace openpower::dump
@@ -57,6 +58,27 @@ uint32_t getDumpIdPrefix(OpDumpTypes dumpType)
         default:
             lg2::error("Unsupported dump type: {TYPE}", "TYPE", dumpType);
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
+    }
+}
+
+std::optional<OpDumpTypes> getDumpTypeFromId(uint32_t id)
+{
+    switch (id & DUMP_ID_TYPE_MASK)
+    {
+        case HARDWARE_DUMP_ID_PREFIX:
+            return OpDumpTypes::Hardware;
+        case HOSTBOOT_DUMP_ID_PREFIX:
+            return OpDumpTypes::Hostboot;
+        case SBE_DUMP_ID_PREFIX:
+            return OpDumpTypes::SBE;
+        case MSBE_DUMP_ID_PREFIX:
+            return OpDumpTypes::MemoryBufferSBE;
+        case SYSTEM_DUMP_ID_PREFIX:
+            return OpDumpTypes::System;
+        case RESOURCE_DUMP_ID_PREFIX:
+            return OpDumpTypes::Resource;
+        default:
+            return std::nullopt;
     }
 }
 } // namespace
@@ -243,6 +265,39 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
             return createSBEDumpEntry(id, objPath, timeStamp, dumpParams);
         default:
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
+    }
+}
+
+std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntryForRestore(
+    uint32_t id, const std::filesystem::path& objPath)
+{
+    auto type = getDumpTypeFromId(id);
+    if (!type.has_value())
+    {
+        lg2::error("Cannot restore unsupported dump ID {DUMP_ID}", "DUMP_ID",
+                   std::format("{:08X}", id));
+        return nullptr;
+    }
+
+    switch (type.value())
+    {
+        case OpDumpTypes::System:
+            return std::make_unique<system::Entry>(bus, objPath.string(), id,
+                                                   mgr);
+        case OpDumpTypes::Resource:
+            return std::make_unique<resource::Entry>(bus, objPath.string(), id,
+                                                     mgr);
+        case OpDumpTypes::Hostboot:
+            return std::make_unique<hostboot::Entry>(bus, objPath.string(), id,
+                                                     mgr);
+        case OpDumpTypes::Hardware:
+            return std::make_unique<hardware::Entry>(bus, objPath.string(), id,
+                                                     mgr);
+        case OpDumpTypes::MemoryBufferSBE:
+        case OpDumpTypes::SBE:
+            return std::make_unique<sbe::Entry>(bus, objPath.string(), id, mgr);
+        default:
+            return nullptr;
     }
 }
 

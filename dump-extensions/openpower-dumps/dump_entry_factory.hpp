@@ -42,6 +42,18 @@ class DumpEntryFactory
     std::unique_ptr<phosphor::dump::Entry> createEntry(
         uint32_t id, const phosphor::dump::DumpCreateParams& params);
 
+    /**
+     * @brief Creates a silently registered entry for restoration.
+     * @param[in] id Persisted dump identifier containing the dump type.
+     * @param[in] objPath D-Bus entry path for the restored entry.
+     * @return The restored entry type, or nullptr for an unknown ID prefix.
+     *
+     * The returned entry does not emit InterfacesAdded. The manager restores
+     * its properties before retaining the object.
+     */
+    std::unique_ptr<phosphor::dump::Entry> createEntryForRestore(
+        uint32_t id, const std::filesystem::path& objPath);
+
   private:
     /**
      * @brief Creates a system dump entry.
