@@ -5,102 +5,130 @@
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/exception.hpp>
 
+#include <chrono>
+#include <exception>
 #include <filesystem>
-#include <regex>
+#include <string>
 
-namespace phosphor
+namespace phosphor::dump::core
 {
-namespace dump
+namespace
 {
-namespace core
-{
+constexpr auto dumpCreateInterface = "xyz.openbmc_project.Dump.Create";
+constexpr auto fallbackRetryInterval = std::chrono::seconds(30);
+} // namespace
 
-using namespace std;
+Manager::Manager(sdbusplus::bus_t& bus, const EventPtr& event) :
+    bus(bus),
+    retryTimer(event.get(), [this](auto&) { retryQueue.timerExpired(); }),
+    retryQueue([this](const auto& file) { return createDump(file); },
+               [this](bool enable) {
+                   if (enable)
+                   {
+                       retryTimer.restartOnce(fallbackRetryInterval);
+                   }
+                   else
+                   {
+                       retryTimer.setEnabled(false);
+                   }
+               }),
+    dumpManagerOwnerMatch(
+        bus, sdbusplus::match_rules::nameOwnerChanged(DUMP_BUSNAME),
+        [this](sdbusplus::message_t& msg) { handleNameOwnerChanged(msg); }),
+    coreWatch(event, IN_NONBLOCK, coreFileEvent, EPOLLIN, CORE_FILE_DIR,
+              [this](const auto& files) { watchCallback(files); })
+{}
 
 void Manager::watchCallback(const UserMap& fileInfo)
 {
-    vector<string> files;
-
-    for (const auto& i : fileInfo)
+    for (const auto& [path, event] : fileInfo)
     {
-        std::filesystem::path file(i.first);
-        std::string name = file.filename();
-
-        /*
-          As per coredump source code systemd-coredump uses below format
-          https://github.com/systemd/systemd/blob/master/src/coredump/coredump.c
-          /var/lib/systemd/coredump/core.%s.%s." SD_ID128_FORMAT_STR “
-          systemd-coredump also creates temporary file in core file path prior
-          to actual core file creation. Checking the file name format will help
-          to limit dump creation only for the new core files.
-        */
-        if ("core" == name.substr(0, name.find('.')))
+        static_cast<void>(event);
+        if (isCoreDumpFile(path))
         {
-            // Consider only file name start with "core."
-            files.push_back(file);
+            retryQueue.enqueue(path);
         }
     }
-
-    if (!files.empty())
-    {
-        createHelper(files);
-    }
 }
 
-void Manager::createHelper(const vector<string>& files)
+void Manager::handleNameOwnerChanged(sdbusplus::message_t& msg)
 {
-    constexpr auto MAPPER_BUSNAME = "xyz.openbmc_project.ObjectMapper";
-    constexpr auto MAPPER_PATH = "/xyz/openbmc_project/object_mapper";
-    constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
-    constexpr auto DUMP_CREATE_IFACE = "xyz.openbmc_project.Dump.Create";
-
-    auto b = sdbusplus::bus::new_default();
-    auto mapper = b.new_method_call(MAPPER_BUSNAME, MAPPER_PATH,
-                                    MAPPER_INTERFACE, "GetObject");
-    mapper.append(BMC_DUMP_OBJPATH, vector<string>({DUMP_CREATE_IFACE}));
-
-    map<string, vector<string>> mapperResponse;
     try
     {
-        auto mapperResponseMsg = b.call(mapper);
-        mapperResponseMsg.read(mapperResponse);
-    }
-    catch (const sdbusplus::exception_t& e)
-    {
-        lg2::error("Failed to GetObject on Dump.Create: {ERROR}", "ERROR", e);
-        return;
-    }
-    if (mapperResponse.empty())
-    {
-        lg2::error("Error reading mapper response");
-        return;
-    }
+        std::string name;
+        std::string oldOwner;
+        std::string newOwner;
+        msg.read(name, oldOwner, newOwner);
 
-    const auto& host = mapperResponse.cbegin()->first;
-    auto m = b.new_method_call(host.c_str(), BMC_DUMP_OBJPATH,
-                               DUMP_CREATE_IFACE, "CreateDump");
-    phosphor::dump::DumpCreateParams params;
-    using CreateParameters =
-        sdbusplus::common::xyz::openbmc_project::dump::Create::CreateParameters;
-    using DumpType =
-        sdbusplus::common::xyz::openbmc_project::dump::Create::DumpType;
-    using DumpIntr = sdbusplus::common::xyz::openbmc_project::dump::Create;
-    params[DumpIntr::convertCreateParametersToString(
-        CreateParameters::DumpType)] =
-        DumpIntr::convertDumpTypeToString(DumpType::ApplicationCored);
-    params[DumpIntr::convertCreateParametersToString(
-        CreateParameters::FilePath)] = files.front();
-    m.append(params);
-    try
-    {
-        b.call_noreply(m);
+        if (name != DUMP_BUSNAME || newOwner.empty() ||
+            retryQueue.pendingCount() == 0)
+        {
+            return;
+        }
+
+        lg2::info("Dump Manager is available; retrying {COUNT} core dumps",
+                  "COUNT", retryQueue.pendingCount());
+        retryQueue.managerAvailable();
     }
-    catch (const sdbusplus::exception_t& e)
+    catch (const std::exception& e)
     {
-        lg2::error("Failed to create dump: {ERROR}", "ERROR", e);
+        lg2::error("Failed to process Dump Manager owner change: {ERROR}",
+                   "ERROR", e);
     }
 }
 
-} // namespace core
-} // namespace dump
-} // namespace phosphor
+RequestResult Manager::createDump(const std::filesystem::path& file)
+{
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(file, ec))
+    {
+        lg2::warning("Core file is no longer available: {FILE}", "FILE", file);
+        return RequestResult::permanentFailure;
+    }
+
+    try
+    {
+        auto method = bus.new_method_call(DUMP_BUSNAME, BMC_DUMP_OBJPATH,
+                                          dumpCreateInterface, "CreateDump");
+
+        phosphor::dump::DumpCreateParams params;
+        using CreateParameters = sdbusplus::common::xyz::openbmc_project::dump::
+            Create::CreateParameters;
+        using DumpType =
+            sdbusplus::common::xyz::openbmc_project::dump::Create::DumpType;
+        using DumpInterface =
+            sdbusplus::common::xyz::openbmc_project::dump::Create;
+
+        params[DumpInterface::convertCreateParametersToString(
+            CreateParameters::DumpType)] =
+            DumpInterface::convertDumpTypeToString(DumpType::ApplicationCored);
+        params[DumpInterface::convertCreateParametersToString(
+            CreateParameters::FilePath)] = file.string();
+        method.append(params);
+
+        auto response = bus.call(method);
+        sdbusplus::object_path entry;
+        response.read(entry);
+        lg2::info("Created core dump request {ENTRY} for {FILE}", "ENTRY",
+                  entry, "FILE", file);
+        return RequestResult::success;
+    }
+    catch (const sdbusplus::exception_t& e)
+    {
+        if (isTransientDBusError(e.name()))
+        {
+            lg2::warning(
+                "Dump Manager is unavailable for {FILE}: {ERROR}; queued for "
+                "retry",
+                "FILE", file, "ERROR", e);
+            return RequestResult::transientFailure;
+        }
+
+        lg2::error(
+            "Core dump request for {FILE} was rejected: {ERROR}; not retrying",
+            "FILE", file, "ERROR", e);
+        return RequestResult::permanentFailure;
+    }
+}
+
+} // namespace phosphor::dump::core
