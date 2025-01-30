@@ -8,6 +8,7 @@
 #include <phosphor-logging/elog.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
+#include <xyz/openbmc_project/Dump/Create/error.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -233,6 +234,15 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
     uint32_t id, const phosphor::dump::DumpCreateParams& params)
 {
     DumpParameters dumpParams = util::extractDumpParameters(params);
+
+    using Disabled =
+        sdbusplus::xyz::openbmc_project::Dump::Create::Error::Disabled;
+    if (isDumpPolicyApplicable(dumpParams.type) && !util::isOPDumpsEnabled(bus))
+    {
+        lg2::info("OpenPOWER dump is disabled by policy: {TYPE}", "TYPE",
+                  dumpParams.type);
+        elog<Disabled>();
+    }
 
     auto entryType = dumpParams.type;
     if (dumpParams.type == OpDumpTypes::Resource &&
