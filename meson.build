@@ -301,6 +301,7 @@ subdir('service_files')
 
 phosphor_dump_monitor_sources = [
     dump_types_hpp,
+    'core_dump_retry.cpp',
     'core_manager.cpp',
     'core_manager_main.cpp',
     'watch.cpp',

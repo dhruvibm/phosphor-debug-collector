@@ -2,17 +2,18 @@
 
 #include "config.h"
 
+#include "core_dump_retry.hpp"
 #include "dump_utils.hpp"
 #include "watch.hpp"
 
-#include <map>
+#include <sdbusplus/bus/match.hpp>
+#include <sdeventplus/utility/timer.hpp>
 
-namespace phosphor
+#include <filesystem>
+
+namespace phosphor::dump::core
 {
-namespace dump
-{
-namespace core
-{
+
 using Watch = phosphor::dump::inotify::Watch;
 using UserMap = phosphor::dump::inotify::UserMap;
 
@@ -30,7 +31,7 @@ static constexpr auto coreFileEvent = IN_CREATE;
 #endif
 
 /** @class Manager
- *  @brief OpenBMC Core manager implementation.
+ *  @brief OpenBMC core dump monitor implementation.
  */
 class Manager
 {
@@ -42,36 +43,27 @@ class Manager
     Manager& operator=(Manager&&) = delete;
     virtual ~Manager() = default;
 
-    /** @brief Constructor to create core watch object.
-     *  @param[in] event - Dump manager sd_event loop.
-     */
-    Manager(const EventPtr& event) :
-        eventLoop(event.get()),
-        coreWatch(eventLoop, IN_NONBLOCK, coreFileEvent, EPOLLIN, CORE_FILE_DIR,
-                  std::bind(std::mem_fn(
-                                &phosphor::dump::core::Manager::watchCallback),
-                            this, std::placeholders::_1))
-    {}
+    /** @brief Construct the core file and Dump Manager monitors. */
+    Manager(sdbusplus::bus_t& bus, const EventPtr& event);
 
   private:
-    /** @brief Helper function for initiating dump request using
-     *         createDump D-Bus interface.
-     *  @param [in] files - Core files list
-     */
-    void createHelper(const std::vector<std::string>& files);
+    using RetryTimer =
+        sdeventplus::utility::Timer<sdeventplus::ClockId::Monotonic>;
 
-    /** @brief Implementation of core watch call back
-     * @param [in] fileInfo - map of file info  path:event
-     */
+    /** @brief Request one ApplicationCored dump entry. */
+    RequestResult createDump(const std::filesystem::path& file);
+
+    /** @brief Enqueue valid core files from an inotify callback. */
     void watchCallback(const UserMap& fileInfo);
 
-    /** @brief sdbusplus Dump event loop */
-    EventPtr eventLoop;
+    /** @brief Retry pending requests when Dump Manager starts. */
+    void handleNameOwnerChanged(sdbusplus::message_t& msg);
 
-    /** @brief Core watch object */
+    sdbusplus::bus_t& bus;
+    RetryTimer retryTimer;
+    RetryQueue retryQueue;
+    sdbusplus::match dumpManagerOwnerMatch;
     Watch coreWatch;
 };
 
-} // namespace core
-} // namespace dump
-} // namespace phosphor
+} // namespace phosphor::dump::core

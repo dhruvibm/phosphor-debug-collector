@@ -29,7 +29,8 @@ int main()
 
     try
     {
-        phosphor::dump::core::Manager manager(eventP);
+        bus.attach_event(eventP.get(), SD_EVENT_PRIORITY_NORMAL);
+        phosphor::dump::core::Manager manager(bus, eventP);
 
         auto rc = sd_event_loop(eventP.get());
         if (rc < 0)

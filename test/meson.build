@@ -19,22 +19,23 @@ if not gtest_dep.found() or not gmock_dep.found()
     endif
 endif
 
-dump = declare_dependency(sources: ['../dump_serialize.cpp'])
+tests = {
+    'core_dump_retry_test': ['../core_dump_retry.cpp'],
+    'debug_inif_test': ['../dump_serialize.cpp'],
+}
 
-tests = ['debug_inif_test']
-
-foreach t : tests
+foreach t, sources : tests
     test(
         t,
         executable(
             t.underscorify(),
             t + '.cpp',
+            sources,
             include_directories: ['.', '../'],
             implicit_include_directories: false,
             dependencies: [
                 gtest_dep,
                 gmock_dep,
-                dump,
                 phosphor_logging_dep,
                 cereal_dep,
             ],
