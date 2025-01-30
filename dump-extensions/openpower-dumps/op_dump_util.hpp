@@ -1,8 +1,7 @@
 #pragma once
 
 #include "dump_utils.hpp"
-
-#include <com/ibm/Dump/Create/common.hpp>
+#include "op_dump_policy.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -10,8 +9,6 @@
 
 namespace openpower::dump
 {
-using OpDumpTypes = sdbusplus::common::com::ibm::dump::Create::DumpType;
-
 /**
  * @struct DumpParameters
  * @brief Holds parameters relevant to dump creation.
@@ -33,12 +30,11 @@ struct DumpParameters
 namespace util
 {
 
-/** @brief Check whether OpenPOWER dumps are enabled
+/** @brief Check whether automatic OpenPOWER dumps are enabled
  *
- * param[in] bus - D-Bus handle
+ * @param[in] bus - D-Bus handle
  *
- * If the settings service is not running then considering as
- * the dumps are enabled.
+ * If the settings service is not running, dumps are considered enabled.
  * @return true - if dumps are enabled, false - if dumps are not enabled
  */
 bool isOPDumpsEnabled(sdbusplus::bus_t& bus);

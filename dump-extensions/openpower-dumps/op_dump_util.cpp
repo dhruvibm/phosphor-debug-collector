@@ -45,12 +45,7 @@ std::optional<T> safeExtractParameter(
 
 bool isOPDumpsEnabled(sdbusplus::bus_t& bus)
 {
-    // Set isEnabled as true by default. In a field deployment, the system dump
-    // feature is usually enabled to facilitate effective debugging in the event
-    // of a failure. If due to some error, the settings service couldn't provide
-    // the actual value, the system assumes that the dump is enabled.
-    // This approach aligns with the principle of collecting as much data as
-    // possible for debugging in case of a system failure.
+    // Fail open if the policy cannot be read so diagnostic data is not lost.
     auto isEnabled = true;
 
     constexpr auto enable = "xyz.openbmc_project.Object.Enable";

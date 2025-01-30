@@ -22,6 +22,7 @@ endif
 tests = {
     'core_dump_retry_test': ['../core_dump_retry.cpp'],
     'debug_inif_test': ['../dump_serialize.cpp'],
+    'op_dump_policy_test': [],
 }
 
 foreach t, sources : tests
@@ -36,6 +37,7 @@ foreach t, sources : tests
             dependencies: [
                 gtest_dep,
                 gmock_dep,
+                phosphor_dbus_interfaces_dep,
                 phosphor_logging_dep,
                 cereal_dep,
             ],
