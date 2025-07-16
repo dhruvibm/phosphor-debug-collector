@@ -180,6 +180,11 @@ openpower::dump::DumpParameters extractDumpParameters(
                 OpCreate::CreateParameters::Password),
             params);
 
+    std::optional<std::string> acfPath = safeExtractParameter<std::string>(
+        OpCreate::convertCreateParametersToString(
+            OpCreate::CreateParameters::ACFPath),
+        params);
+
     std::optional<uint64_t> eid = safeExtractParameter<uint64_t>(
         OpCreate::convertCreateParametersToString(
             OpCreate::CreateParameters::ErrorLogId),
@@ -213,15 +218,11 @@ openpower::dump::DumpParameters extractDumpParameters(
         }
     }
 
-    return {dumpType,
-            vspString,
-            userChallenge,
-            eid,
-            fid,
-            originatorId,
-            originatorType,
-            dumpFilesPath,
-            sbeDumpTriggerType};
+    return {dumpType,      vspString,
+            userChallenge, acfPath,
+            eid,           fid,
+            originatorId,  originatorType,
+            dumpFilesPath, sbeDumpTriggerType};
 }
 
 [[noreturn]] void throwInvalidArgument(const std::string& argumentName,

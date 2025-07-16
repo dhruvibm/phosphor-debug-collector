@@ -238,7 +238,7 @@ class Entry : public virtual openpower::dump::Entry, public virtual ResourceIntf
 
     Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
           uint64_t timeStamp, uint64_t fileSize, std::string vspSelector,
-          std::string userChallengeValue,
+          std::string userChallengeValue, std::string acfPathValue,
           phosphor::dump::OperationStatus status, std::string originatorId,
           originatorTypes originatorType, phosphor::dump::Manager& parent) :
         phosphor::dump::Entry(bus, objPath.c_str(), dumpId, timeStamp, fileSize,
@@ -252,6 +252,7 @@ class Entry : public virtual openpower::dump::Entry, public virtual ResourceIntf
         sourceDumpId(INVALID_SOURCE_ID);
         vspString(std::move(vspSelector));
         userChallenge(std::move(userChallengeValue));
+        acfPath(std::move(acfPathValue));
         this->ResourceIntf::emit_object_added();
     }
 
