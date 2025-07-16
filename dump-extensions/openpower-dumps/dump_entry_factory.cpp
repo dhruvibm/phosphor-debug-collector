@@ -164,7 +164,7 @@ std::unique_ptr<phosphor::dump::Entry>
     return std::make_unique<resource::Entry>(
         bus, objPath.c_str(), id, timeStamp, 0,
         dumpParams.vspString.value_or(""),
-        dumpParams.userChallenge.value_or(""),
+        dumpParams.userChallenge.value_or(""), dumpParams.acfPath.value_or(""),
         phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
         dumpParams.originatorType, mgr);
 }
