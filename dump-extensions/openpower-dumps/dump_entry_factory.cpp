@@ -227,7 +227,8 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createSBEDumpEntry(
         bus, objPath.c_str(), id, timeStamp, 0, std::filesystem::path(),
         phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
         dumpParams.originatorType, dumpParams.eid.value(),
-        dumpParams.fid.value(), mgr);
+        dumpParams.fid.value(), mgr, dumpParams.dumpFilesPath,
+        dumpParams.sbeDumpTriggerType);
 }
 
 std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(

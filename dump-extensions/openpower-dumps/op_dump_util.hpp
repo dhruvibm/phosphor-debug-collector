@@ -3,6 +3,8 @@
 #include "dump_utils.hpp"
 #include "op_dump_policy.hpp"
 
+#include <com/ibm/Dump/Create/common.hpp>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -18,6 +20,9 @@ namespace openpower::dump
  */
 struct DumpParameters
 {
+    using SBEDumpTriggerType =
+        sdbusplus::common::com::ibm::dump::Create::SBEDumpTriggerType;
+
     OpDumpTypes type;
     std::optional<std::string> vspString;
     std::optional<std::string> userChallenge;
@@ -25,6 +30,8 @@ struct DumpParameters
     std::optional<uint64_t> fid;
     std::string originatorId;
     phosphor::dump::originatorTypes originatorType;
+    std::optional<std::string> dumpFilesPath;
+    std::optional<SBEDumpTriggerType> sbeDumpTriggerType;
 };
 
 namespace util

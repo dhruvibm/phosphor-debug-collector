@@ -190,8 +190,38 @@ openpower::dump::DumpParameters extractDumpParameters(
             OpCreate::CreateParameters::FailingUnitId),
         params);
 
-    return {dumpType, vspString,    userChallenge, eid,
-            fid,      originatorId, originatorType};
+    std::optional<std::string> dumpFilesPath =
+        safeExtractParameter<std::string>(
+            OpCreate::convertCreateParametersToString(
+                OpCreate::CreateParameters::DumpFilesPath),
+            params);
+
+    const auto triggerTypeKey = OpCreate::convertCreateParametersToString(
+        OpCreate::CreateParameters::SBEDumpTriggerType);
+    auto triggerTypeString =
+        safeExtractParameter<std::string>(triggerTypeKey, params);
+    std::optional<DumpParameters::SBEDumpTriggerType> sbeDumpTriggerType;
+    if (triggerTypeString.has_value())
+    {
+        sbeDumpTriggerType =
+            OpCreate::convertStringToSBEDumpTriggerType(*triggerTypeString);
+        if (!sbeDumpTriggerType.has_value())
+        {
+            lg2::error("An invalid value was passed for {KEY}", "KEY",
+                       triggerTypeKey);
+            throwInvalidArgument(triggerTypeKey, "INVALID_INPUT");
+        }
+    }
+
+    return {dumpType,
+            vspString,
+            userChallenge,
+            eid,
+            fid,
+            originatorId,
+            originatorType,
+            dumpFilesPath,
+            sbeDumpTriggerType};
 }
 
 [[noreturn]] void throwInvalidArgument(const std::string& argumentName,

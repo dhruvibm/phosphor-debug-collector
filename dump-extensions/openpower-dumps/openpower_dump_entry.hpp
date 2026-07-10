@@ -3,6 +3,7 @@
 #include "dump_entry.hpp"
 #include "op_dump_consts.hpp"
 
+#include <com/ibm/Dump/Create/common.hpp>
 #include <com/ibm/Dump/Entry/Hardware/server.hpp>
 #include <com/ibm/Dump/Entry/Hostboot/server.hpp>
 #include <com/ibm/Dump/Entry/Resource/server.hpp>
@@ -434,6 +435,8 @@ namespace sbe
 
 using SBEIntf =
     sdbusplus::server::object_t<sdbusplus::com::ibm::Dump::Entry::server::SBE>;
+using SBEDumpTriggerType =
+    sdbusplus::common::com::ibm::dump::Create::SBEDumpTriggerType;
 
 /** @class Entry
  *  @brief File-backed SBE dump entry.
@@ -448,12 +451,30 @@ class Entry : public virtual openpower::dump::Entry, public virtual SBEIntf
     Entry& operator=(Entry&&) = delete;
     ~Entry() = default;
 
+    /** @brief Constructor for the SBE Dump Entry Object
+     *  @param[in] bus - Bus to attach to.
+     *  @param[in] objPath - Object path to attach to.
+     *  @param[in] dumpId - Unique identifier for the dump.
+     *  @param[in] timeStamp - Dump creation timestamp since the epoch.
+     *  @param[in] fileSize - Size of the dump file in bytes.
+     *  @param[in] file - Path to the dump file.
+     *  @param[in] status - Current status of the dump.
+     *  @param[in] originatorId - Identifier of the originator of the dump.
+     *  @param[in] originatorType - Type of the originator.
+     *  @param[in] errorLogIdValue - Associated error log identifier.
+     *  @param[in] failingUnitIdValue - Identifier of the failing unit.
+     *  @param[in] parent - Reference to the managing dump manager.
+     *  @param[in] dumpFilesPathValue - Optional caller-provided files path.
+     *  @param[in] triggerType - Optional SBE dump trigger type.
+     */
     Entry(sdbusplus::bus_t& bus, const std::string& objPath, uint32_t dumpId,
           uint64_t timeStamp, uint64_t fileSize,
           const std::filesystem::path& file,
           phosphor::dump::OperationStatus status, std::string originatorId,
           originatorTypes originatorType, uint64_t errorLogIdValue,
-          uint64_t failingUnitIdValue, phosphor::dump::Manager& parent) :
+          uint64_t failingUnitIdValue, phosphor::dump::Manager& parent,
+          const std::optional<std::string>& dumpFilesPathValue,
+          const std::optional<SBEDumpTriggerType>& triggerType) :
         phosphor::dump::Entry(bus, objPath.c_str(), dumpId, timeStamp, fileSize,
                               file, status, originatorId, originatorType,
                               parent),
@@ -463,6 +484,15 @@ class Entry : public virtual openpower::dump::Entry, public virtual SBEIntf
     {
         errorLogId(errorLogIdValue);
         failingUnitId(failingUnitIdValue);
+        if (dumpFilesPathValue.has_value())
+        {
+            dumpFilesPath(*dumpFilesPathValue);
+        }
+        if (triggerType.has_value())
+        {
+            sbeDumpTriggerType(*triggerType);
+        }
+
         this->SBEIntf::emit_object_added();
     }
 
