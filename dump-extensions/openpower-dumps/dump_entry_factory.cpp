@@ -1,9 +1,7 @@
 #include "dump_entry_factory.hpp"
 
-#include "op_dump_consts.hpp"
 #include "op_dump_util.hpp"
-#include "resource_dump_entry.hpp"
-#include "system_dump_entry.hpp"
+#include "openpower_dump_entry.hpp"
 
 #include <phosphor-logging/elog-errors.hpp>
 #include <phosphor-logging/elog.hpp>
@@ -87,7 +85,7 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createSystemDumpEntry(
     }
 
     return std::make_unique<system::Entry>(
-        bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
+        bus, objPath.c_str(), id, timeStamp, 0,
         phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
         dumpParams.originatorType, mgr);
 }
@@ -110,7 +108,7 @@ std::unique_ptr<phosphor::dump::Entry>
     if (createsNonDisruptiveSystemDump(dumpParams.vspString))
     {
         return std::make_unique<system::Entry>(
-            bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
+            bus, objPath.c_str(), id, timeStamp, 0,
             phosphor::dump::OperationStatus::InProgress,
             dumpParams.originatorId, dumpParams.originatorType,
             system::SystemImpact::NonDisruptive,
@@ -118,7 +116,7 @@ std::unique_ptr<phosphor::dump::Entry>
     }
 
     return std::make_unique<resource::Entry>(
-        bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
+        bus, objPath.c_str(), id, timeStamp, 0,
         dumpParams.vspString.value_or(""),
         dumpParams.userChallenge.value_or(""),
         phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
