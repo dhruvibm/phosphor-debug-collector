@@ -2,7 +2,6 @@
 
 #include "com/ibm/Dump/Entry/Resource/server.hpp"
 #include "dump_entry.hpp"
-#include "dump_manager_resource.hpp"
 
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server/object.hpp>
@@ -23,8 +22,6 @@ using EntryIfaces = sdbusplus::server::object_t<
 
 using originatorTypes = sdbusplus::xyz::openbmc_project::Common::server::
     OriginatedBy::OriginatorTypes;
-
-class Manager;
 
 /** @class Entry
  *  @brief Resource Dump Entry implementation.

@@ -2,6 +2,7 @@
 
 #include "op_dump_consts.hpp"
 #include "op_dump_util.hpp"
+#include "resource_dump_entry.hpp"
 #include "system_dump_entry.hpp"
 
 #include <phosphor-logging/elog-errors.hpp>
@@ -69,12 +70,34 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createSystemDumpEntry(
         dumpParams.originatorType, mgr);
 }
 
+std::unique_ptr<phosphor::dump::Entry>
+    DumpEntryFactory::createResourceDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams)
+{
+    using NotAllowed =
+        sdbusplus::xyz::openbmc_project::Common::Error::NotAllowed;
+    using Reason = xyz::openbmc_project::Common::NotAllowed::REASON;
+
+    if (!phosphor::dump::isHostRunning())
+    {
+        elog<NotAllowed>(
+            Reason("Resource dump can be initiated only when the host is up"));
+    }
+
+    return std::make_unique<resource::Entry>(
+        bus, objPath.c_str(), id, timeStamp, 0, INVALID_SOURCE_ID,
+        dumpParams.vspString.value_or(""),
+        dumpParams.userChallenge.value_or(""),
+        phosphor::dump::OperationStatus::InProgress, dumpParams.originatorId,
+        dumpParams.originatorType, mgr);
+}
+
 std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
     uint32_t id, const phosphor::dump::DumpCreateParams& params)
 {
     DumpParameters dumpParams = util::extractDumpParameters(params);
 
-    id |= getDumpIdPrefix(dumpParams.type);
     std::string idStr = std::format("{:08X}", id);
 
     auto objPath = std::filesystem::path(baseEntryPath) / idStr;
@@ -88,23 +111,13 @@ std::unique_ptr<phosphor::dump::Entry> DumpEntryFactory::createEntry(
     {
         case OpDumpTypes::System:
             return createSystemDumpEntry(id, objPath, timeStamp, dumpParams);
+        case OpDumpTypes::Resource:
+            return createResourceDumpEntry(id, objPath, timeStamp, dumpParams);
 
         default:
             util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
     }
     return nullptr;
-}
-
-uint32_t DumpEntryFactory::getDumpIdPrefix(OpDumpTypes dumpType)
-{
-    switch (dumpType)
-    {
-        case OpDumpTypes::System:
-            return 0x00000000;
-        default:
-            lg2::error("Unsupported dump type: {TYPE}", "TYPE", dumpType);
-            util::throwInvalidArgument("DUMP_TYPE_NOT_VALID", "INVALID_INPUT");
-    }
 }
 
 } // namespace openpower::dump

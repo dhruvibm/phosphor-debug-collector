@@ -56,11 +56,16 @@ class DumpEntryFactory
         const DumpParameters& dumpParams);
 
     /**
-     * @brief Retrieves the dump ID prefix based on the dump type.
-     * @param[in] dumpType Type of the dump (system, resource, etc.).
-     * @return The prefix to be used for the dump ID.
+     * @brief Creates a resource dump entry.
+     * @param[in] id The unique identifier for the resource dump entry.
+     * @param[in] objPath D-Bus entry path for the dump entry.
+     * @param[in] timeStamp Timestamp marking the creation time of the dump.
+     * @param[in] dumpParams Parameters specific to the dump being created.
+     * @return A unique pointer to a newly created resource dump entry.
      */
-    static uint32_t getDumpIdPrefix(OpDumpTypes dumpType);
+    std::unique_ptr<phosphor::dump::Entry> createResourceDumpEntry(
+        uint32_t id, const std::filesystem::path& objPath, uint64_t timeStamp,
+        const DumpParameters& dumpParams);
 
     /** @brief sdbusplus DBus bus connection. */
     sdbusplus::bus_t& bus;
