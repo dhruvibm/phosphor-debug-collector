@@ -143,24 +143,6 @@ option(
     description: 'The fault log dump entry D-Bus object path',
 )
 
-# Configurations for openpower-dump extension
-
-# Resource dump options
-
-option(
-    'RESOURCE_DUMP_OBJPATH',
-    type: 'string',
-    value: '/xyz/openbmc_project/dump/resource',
-    description: 'The resource dump manager D-Bus object path',
-)
-
-option(
-    'RESOURCE_DUMP_OBJ_ENTRY',
-    type: 'string',
-    value: '/xyz/openbmc_project/dump/resource/entry',
-    description: 'The resource dump entry D-Bus object path',
-)
-
 option(
     'dump-compression-algorithm',
     type: 'combo',
