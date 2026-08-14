@@ -52,3 +52,16 @@ the dump type, with the priority built into the name:
 /usr/share/dreport.d/pl_elog.d/E5bmcstate
 /usr/share/dreport.d/pl_core.d/E5bmcstate
 ```
+
+## Packaging extension
+
+Platforms that require a different archive format can install a packaging
+extension at `/usr/share/dreport.d/include.d/package`. The extension is sourced
+after the default `package()` function is declared and can replace that function
+with a platform implementation.
+
+The replacement `package()` function is responsible for creating the archive,
+copying it to `dump_dir`, removing the temporary collection directory and
+returning one of the standard dreport error codes. The collection and argument
+handling remain common. If the extension is not installed, dreport uses its
+default packaging implementation.

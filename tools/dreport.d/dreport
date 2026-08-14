@@ -57,6 +57,7 @@ declare -rx DREPORT_INCLUDE="$DREPORT_SOURCE/include.d"
 declare -rx ZERO="0"
 declare -rx JOURNAL_LINE_LIMIT="500"
 declare -rx HEADER_EXTENSION="$DREPORT_INCLUDE/gendumpheader"
+declare -rx PACKAGE_EXTENSION="$DREPORT_INCLUDE/package"
 
 #Error Codes
 declare -rx SUCCESS="0"
@@ -271,6 +272,14 @@ function package()
     #Remove the temporary copy of the file
     rm "$ARCHIVE_PATH"
 }
+
+# A platform can replace the complete packaging implementation. Source the
+# extension after declaring the default package function so the extension can
+# redefine it without changing the collection flow.
+if [ -r "$PACKAGE_EXTENSION" ]; then
+    # shellcheck source=/dev/null
+    . "$PACKAGE_EXTENSION"
+fi
 
 # @brief Main function
 function main()
