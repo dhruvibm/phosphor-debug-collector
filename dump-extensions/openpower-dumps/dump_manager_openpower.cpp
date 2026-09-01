@@ -6,7 +6,6 @@
 #include "dump_utils.hpp"
 #include "op_dump_consts.hpp"
 #include "op_dump_util.hpp"
-#include "system_dump_entry.hpp"
 
 #include <com/ibm/Dump/Create/common.hpp>
 #include <phosphor-logging/elog-errors.hpp>
@@ -110,27 +109,6 @@ void Manager::updateEntry(const std::filesystem::path& fullPath)
                    std::format("{:08X}", dumpId));
         return;
     }
-    // System dump entries (host::system::Entry) do not inherit from
-    // openpower::dump::Entry — they use a separate class hierarchy
-    // (host::Entry<T> -> phosphor::dump::Entry).  Before MPIPL file
-    // packaging, System dumps completed via notifyDump() and never
-    // reached updateEntry().  Now that IN_MOVED_TO is watched and the
-    // event loop is free, updateEntry() is called for System dumps for
-    // the first time.  Handle them explicitly before falling through to
-    // the openpower::dump::Entry path used by HW/HB/SBE dumps.
-    auto sysEntry = dynamic_cast<host::system::Entry*>(it->second.get());
-    if (sysEntry != nullptr)
-    {
-        lg2::info("updateEntry: completing system dump entry {DUMP_ID}",
-                  "DUMP_ID", std::format("{:08X}", dumpId));
-        sysEntry->elapsed(timestamp);
-        sysEntry->size(fileSize);
-        sysEntry->status(phosphor::dump::OperationStatus::Completed);
-        sysEntry->completedTime(timestamp);
-        sysEntry->serialize();
-        return;
-    }
-
     auto opEntry = dynamic_cast<openpower::dump::Entry*>(it->second.get());
     if (opEntry == nullptr)
     {
